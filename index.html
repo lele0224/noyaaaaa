@@ -22450,6 +22450,7 @@ function handleReviewAnswer(isCorrect, step) {
             state.reviewStep = 'spell';
             el.noahThought.textContent = `（回顾中：现在，拼写它。）`;
             displaySpell();
+ state.isWaiting = false; 
         }, 1500);
     } else if (step === 'spell') {
         const word = state.currentWord;
@@ -22464,6 +22465,7 @@ function handleReviewAnswer(isCorrect, step) {
         updateReviewButton();
         updateStats();
         state.isWaitingForNext = true;
+showNextButton();
     }
 }
 function updateReviewButton() { const wrongWordsCount = state.words.filter(w => w.incorrect > 0).length; el.reviewBtn.textContent = `错题回顾 (${wrongWordsCount})`; el.reviewBtn.disabled = wrongWordsCount === 0; }
