@@ -28169,11 +28169,36 @@ function formatText(text) {
 
 // --- Core Functions ---
 function applyLoadedState() {
-    updateStats(); updateStreakCounter(); updateSceneButton(); updateWeatherUI(); updateReviewButton();
+    // --- 【Bug修复核心代码 START】 ---
+    // 自动校准等级：遍历所有等级标准，确保你的当前等级与好感度匹配
+    // 防止出现“好感度很高，但等级还是LV0”的情况
+    for (let i = 0; i < noah.levels.length; i++) {
+        if (state.affection >= noah.levels[i].affection) {
+            // 如果计算出的等级比当前记录的等级高，直接覆盖
+            if (i > state.level) {
+                state.level = i;
+            }
+        }
+    }
+    // --- 【Bug修复核心代码 END】 ---
+
+    updateStats(); 
+    updateStreakCounter(); 
+    updateSceneButton(); 
+    updateWeatherUI(); 
+    updateReviewButton();
+    
     if(state.currentScene) el.body.className = `scene-${state.currentScene}`;
     el.gameTitle.textContent = `${state.profile.name}的备考契约`;
-    Object.entries(state.unlockedDialogues).forEach(([key, value]) => { if(value) noah.dialogue[key] = true; });
-    if(state.purchasedItems.includes('magic_rose')) { document.querySelector('#character-name').innerHTML = '诺亚·司德里安 🌹'; }
+    
+    Object.entries(state.unlockedDialogues).forEach(([key, value]) => { 
+        if(value) noah.dialogue[key] = true; 
+    });
+    
+    if(state.purchasedItems.includes('magic_rose')) { 
+        document.querySelector('#character-name').innerHTML = '诺亚·司德里安 🌹'; 
+    }
+    
     if(state.activeEffects.visual_effect === 'mood_ink') updateDialogueColor();
     updateFeatureButtons();
 }
@@ -28975,8 +29000,39 @@ function showDialogue(type, forcedText = null) {
 
 function updateTime() { const now = new Date(); const day = String(now.getDate()).padStart(2, '0'); const month = String(now.getMonth() + 1).padStart(2, '0'); const year = now.getFullYear(); const days = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']; el.dateDisplay.textContent = `${year}-${month}-${day}, ${days[now.getDay()]}`; const hours = String(now.getHours()).padStart(2, '0'); const minutes = String(now.getMinutes()).padStart(2, '0'); const seconds = String(now.getSeconds()).padStart(2, '0'); el.timeDisplay.textContent = `${hours}:${minutes}:${seconds}`; }
 function showEtymologyCorner() { state.isWaitingForNext = true; const bonusPoints = 15; state.focusPoints += bonusPoints; updateStats(); const text = `${state.currentWord.etymology}<br><br><i>(+${bonusPoints} 专注点)</i>`; showEvent("诺亚·司德里安的词源学课堂", text); }
-function checkLevelUp() { const nextLevelIndex = state.level + 1; if (nextLevelIndex >= noah.levels.length) return; const nextLevel = noah.levels[nextLevelIndex]; if (state.affection >= nextLevel.affection) { state.level = nextLevelIndex; const levelUpText = noah.dialogue.levelUp[state.level].replace(/乐乐/g, state.profile.name); if (levelUpText) { logEvent('level_up', {newLevelName: nextLevel.name}); showEvent('关系变更', levelUpText); } checkAchievements(); updateSceneButton(); if (noah.levels[state.level].name === '【无上爱意】') setTimeout(() => {endGame(true); saveState();}, 2000); } }
-function endGame(final = false) { state.isWaiting = true; clearIdleTimer(); document.querySelector('.game-container').innerHTML = `<div style="text-align:center; padding: 20px;"><h1 style="color:var(--accent-color);">Conquest Complete.</h1><p style="font-size:1.2rem;line-height:1.8;margin-top:30px;">理论学习结束了，我的女孩。<br>现在，过来。</p></div>`; if (!final) { const finalLvl = noah.levels.length - 1; el.relLevel.textContent = noah.levels[finalLvl].name; el.dialogue.innerHTML = noah.dialogue.levelUp[finalLvl]; } }
+function checkLevelUp() { 
+    const nextLevelIndex = state.level + 1; 
+    
+    // 如果已经满级，不再检查
+    if (nextLevelIndex >= noah.levels.length) return; 
+    
+    const nextLevel = noah.levels[nextLevelIndex]; 
+    
+    // 检查好感度是否达标
+    if (state.affection >= nextLevel.affection) { 
+        state.level = nextLevelIndex; 
+        
+        // 触发升级对话
+        const levelUpText = noah.dialogue.levelUp[state.level].replace(/乐乐/g, state.profile.name); 
+        if (levelUpText) { 
+            logEvent('level_up', {newLevelName: nextLevel.name}); 
+            showEvent('关系变更', levelUpText); 
+        } 
+        
+        checkAchievements(); 
+        updateSceneButton(); 
+        
+        // 如果满级了，触发结局
+        if (noah.levels[state.level].name === '【无上爱意】') {
+            setTimeout(() => {endGame(true); saveState();}, 2000);
+        } else {
+            // --- 【Bug修复核心】 ---
+            // 递归调用：如果好感度溢出很多，立即再次检查下一级
+            // 这样就不会卡在低等级了
+            checkLevelUp(); 
+        }
+    } 
+}function endGame(final = false) { state.isWaiting = true; clearIdleTimer(); document.querySelector('.game-container').innerHTML = `<div style="text-align:center; padding: 20px;"><h1 style="color:var(--accent-color);">Conquest Complete.</h1><p style="font-size:1.2rem;line-height:1.8;margin-top:30px;">理论学习结束了，我的女孩。<br>现在，过来。</p></div>`; if (!final) { const finalLvl = noah.levels.length - 1; el.relLevel.textContent = noah.levels[finalLvl].name; el.dialogue.innerHTML = noah.dialogue.levelUp[finalLvl]; } }
 function updateStats() { el.focusPoints.textContent = state.focusPoints; updateMasteredCount(); const currentLevel = noah.levels[state.level]; el.relLevel.textContent = currentLevel.name; const nextLevel = noah.levels[state.level + 1]; if (nextLevel) { const range = nextLevel.affection - currentLevel.affection; const progress = state.affection - currentLevel.affection; el.relProgress.style.width = `${Math.max(0, Math.min(100, (progress / range) * 100))}%`; } else { el.relProgress.style.width = '100%'; } updateNoahStateUI(); }
 function getGiftReaction(item) { if (item.reaction) return item.reaction; if (item.reactions) { if (item.reactions.low_mood && state.noahState.mood < 40) return item.reactions.low_mood; if (item.reactions.high_mood && state.noahState.mood > 80) return item.reactions.high_mood; if (item.reactions.high_level && state.level >= (item.unlockLevel || 1) + 1) return item.reactions.high_level; return item.reactions.default || '...'; } return `我收下了【${item.name}】。`; }
 // --- 请复制并覆盖原有的 function buyItem(itemId) ---
